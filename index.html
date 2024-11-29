@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RxJS - Average Age of People in Poland</title>
+    <script src="https://cdn.jsdelivr.net/npm/rxjs@7.8.0/dist/bundles/rxjs.umd.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        #result {
+            font-size: 2em;
+            font-weight: bold;
+            margin-top: 20px;
+            color: #2c3e50;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+
+        .person-row {
+            font-size: 1.1em;
+        }
+
+        .poland {
+            background-color: #A8E6A2; 
+        }
+
+        .countries-list {
+            font-style: italic;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>RxJS - Average Age of People in Poland</h1>
+
+    <div id="result"></div>
+
+    <div id="person-list" style="display:none;">
+        <h2>People in Poland:</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                </tr>
+            </thead>
+            <tbody id="person-table-body">
+            </tbody>
+        </table>
+    </div>
+
+    <div id="all-persons-list" style="display:none;">
+        <h2>All Persons:</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Age</th>
+                    <th>Country</th>
+                </tr>
+            </thead>
+            <tbody id="all-persons-table-body">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let persons = [
+            { id: 1, name: "Jan Kowalski" },
+            { id: 2, name: "John Doe" },
+            { id: 3, name: "Jarek Kaczka" }
+        ];
+
+        let ages = [
+            { person: 1, age: 18 },
+            { person: 2, age: 24 },
+            { person: 3, age: 666 }
+        ];
+
+        let locations = [
+            { person: 1, country: "Poland" },
+            { person: 3, country: "Poland" },
+            { person: 1, country: "USA" }
+        ];
+
+        const { from } = rxjs;
+        const { mergeMap, map, reduce } = rxjs.operators;
+
+        const agesMap = ages.reduce((acc, { person, age }) => {
+            acc[person] = age;
+            return acc;
+        }, {});
+
+        const persons$ = from(persons);
+
+        const personsWithAge$ = persons$.pipe(
+            mergeMap(person => {
+                const age = agesMap[person.id];
+                return age ? [{ ...person, age }] : [];
+            })
+        );
+
+        const personsInPoland$ = personsWithAge$.pipe(
+            mergeMap(person => {
+                const countries = locations.filter(loc => loc.person === person.id).map(loc => loc.country);
+                if (countries.includes("Poland")) {
+                    return [person];
+                }
+                return [];
+            })
+        );
+
+        personsInPoland$.pipe(
+            reduce((acc, person) => {
+                acc.totalAge += person.age;
+                acc.count++;
+                acc.people.push({ name: person.name, age: person.age });
+                return acc;
+            }, { totalAge: 0, count: 0, people: [] }),
+            map(result => {
+                const avgAge = result.count > 0 ? result.totalAge / result.count : 0;
+                return { avgAge, people: result.people };
+            })
+        ).subscribe(({ avgAge, people }) => {
+            document.getElementById('result').textContent = `Average age of people in Poland: ${Math.round(avgAge)} years`;
+
+            const personTableBody = document.getElementById('person-table-body');
+            people.forEach(person => {
+                const row = document.createElement('tr');
+                row.classList.add('person-row');
+                row.innerHTML = `<td>${person.name}</td><td>${person.age}</td>`;
+                personTableBody.appendChild(row);
+            });
+
+            document.getElementById('person-list').style.display = 'block';
+        });
+
+        from(persons).pipe(
+            mergeMap(person => {
+                const age = agesMap[person.id];
+                const countries = locations.filter(loc => loc.person === person.id).map(loc => loc.country);
+                return age ? [{ ...person, age, countries }] : [];
+            })
+        ).subscribe(allPersons => {
+            const allPersonsTableBody = document.getElementById('all-persons-table-body');
+            allPersons.forEach(person => {
+                const row = document.createElement('tr');
+                const rowClass = person.countries.includes('Poland') ? 'poland' : '';
+                row.classList.add(rowClass);
+                row.innerHTML = `<td>${person.name}</td><td>${person.age}</td><td class="countries-list">${person.countries.join(', ')}</td>`;
+                allPersonsTableBody.appendChild(row);
+            });
+
+            document.getElementById('all-persons-list').style.display = 'block';
+        });
+    </script>
+</body>
+</html>
